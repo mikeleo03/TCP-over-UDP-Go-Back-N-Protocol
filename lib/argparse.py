@@ -5,12 +5,12 @@ class FileTransferArgumentParser:
         self.is_server = is_server
 
         # Dictionary to store server-specific arguments
-        self.server_arguments = {"broadcast_port": "", 
+        self.server_arguments = {"broadcast_port": 0, 
                                  "pathfile_input": ""}
 
         # Dictionary to store client-specific arguments
-        self.client_arguments = {"client_port": "",
-                                 "broadcast_port": "",
+        self.client_arguments = {"client_port": 0,
+                                 "broadcast_port": 0,
                                  "pathfile_output": ""}
 
         self._parse_arguments()
@@ -45,7 +45,7 @@ class FileTransferArgumentParser:
         # Parse server arguments
         args = parser.parse_args()
         self.server_arguments = {
-            "broadcast port": args.broadcast_port,
+            "broadcast_port": args.broadcast_port,
             "pathfile_input": args.pathfile_input,
         }
 
@@ -78,9 +78,9 @@ class FileTransferArgumentParser:
         # Parse client arguments
         args = parser.parse_args()
         self.client_arguments = {
-            "client port": args.client_port,
-            "broadcast port": args.broadcast_port,
-            "pathfile output": args.pathfile_output,
+            "client_port": args.client_port,
+            "broadcast_port": args.broadcast_port,
+            "pathfile_output": args.pathfile_output,
         }
 
     def get_value(self):
