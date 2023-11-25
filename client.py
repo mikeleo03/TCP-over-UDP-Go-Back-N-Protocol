@@ -1,19 +1,11 @@
 import time
 import logging
+from socket import timeout
 
 from lib.segment import Segment
-import lib.segment as segment
 from lib.argparse import FileTransferArgumentParser
 from lib.connection import Connection
-from lib.constant import (
-    SYN_FLAG,
-    ACK_FLAG,
-    FIN_FLAG,
-    SYN_ACK_FLAG,
-    FIN_ACK_FLAG,
-    TIMEOUT,
-)
-
+from lib.constant import SYN_FLAG, ACK_FLAG, FIN_FLAG, SYN_ACK_FLAG, FIN_ACK_FLAG, TIMEOUT, TIMEOUT_LISTEN
 
 class Client:
     def __init__(self):
@@ -64,7 +56,66 @@ class Client:
 
     def three_way_handshake(self):
         # Three Way Handshake Protocol, for client-side to establishing connection with server
-        pass
+        while True:
+            try:
+                # Receive data from server
+                data, server_address = self.connection.listen_single_segment(TIMEOUT_LISTEN)
+                self.segment.set_from_bytes(data)
+
+                # Check flag in segment
+                # If segment flag is SYN, server want to establish connection. Send SYN-ACK flag.
+                if self.segment.get_flag() == SYN_FLAG:
+                    # Set SYN-ACK flag
+                    self.segment.set_flag(["SYN", "ACK"])
+
+                    # Initialize sequence and ACK number in segment header
+                    segment_header = self.segment.get_header()
+                    segment_header["ack_num"] = segment_header["seq_num"] + 1
+                    segment_header["seq_num"] = 0
+                    self.segment.set_header(segment_header)
+
+                    # Show status
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Sending SYN-ACK")
+
+                    # Send segment to server
+                    self.connection.send_data(self.segment.get_bytes(), server_address)
+                # If segment flag is SYN-ACK, resend that flag to server.
+                elif self.segment.get_flag() == SYN_ACK_FLAG:
+                    # Show status
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Resending SYN-ACK")
+
+                    # Resend the same segment to server
+                    self.connection.send_data(self.segment.get_bytes(), server_address)
+                # If segment flag is ACK, then three-way handshake is completed
+                elif self.segment.get_flag() == ACK_FLAG:
+                    # Show status
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Received ACK")
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Connection established")
+                    break
+                # Other than that, reset connection with server. Send SYN-ACK to server
+                else:
+                    # Set SYN-ACK flag
+                    self.segment.set_flag(["SYN", "ACK"])
+
+                    # Reset sequence and ACK number in segment header
+                    segment_header = self.segment.get_header()
+                    segment_header["ack_num"] = 1
+                    segment_header["seq_num"] = 0
+                    self.segment.set_header(segment_header)
+
+                    # Show status
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Segment file received. Resetting connection to server")
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] Sending SYN-ACK")
+
+                    # Send segment to server
+                    self.connection.send_data(self.segment.get_bytes(), server_address)
+            except timeout:
+                # If timeout happened when waiting for server ACK flag (third phase of handshake)
+                if self.segment.get_flag() == SYN_ACK_FLAG:
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] ACK response timeout")
+                # Other than that, timeout happened when waiting for server SYN flag
+                else:
+                    print(f"[!] [Server {server_address[0]}:{server_address[1]}] SYN response timeout")
 
     def listen_file_transfer(self):
         # File transfer, client-side
@@ -84,7 +135,7 @@ class Client:
                 self.segment.set_from_bytes(data)
 
                 if not self.segment.valid_checksum():
-                    # Ignore segemnts with invalid checksum
+                    # Ignore segment with invalid checksum
                     self.logger.warning(
                         f"[!] [Server {server_address[0]}:{server_address[1]}] "
                         f"Ignored Segment {self.segment.get_header()['seq_num']} [Invalid checksum]"
@@ -130,13 +181,12 @@ class Client:
                     )
 
                 self.send_ack(server_address, request_number)
-
-            except socket_timeout:
+            except timeout:
                 self.logger.warning(
                     f"[!] [Server {server_address[0]}:{server_address[1]}] "
                     f"[Timeout] timeout error, resending prev seq num"
                 )
-            self.send_ack(server_address, request_number)
+                self.send_ack(server_address, request_number)
 
         self.logger.info(
             f"[!] [Server {server_address[0]}:{server_address[1]}] Data received successfully"
