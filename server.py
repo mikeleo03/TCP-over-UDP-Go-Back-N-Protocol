@@ -114,7 +114,7 @@ class Server:
                 if choice == "n":
                     print("\nClient list:")
                     for index, (ip, port) in enumerate(self.client_list):
-                        print(f"{index+1} {ip}:{port}")
+                        print(f"{index+1}. {ip}:{port}")
                     print("")
                     break
             except timeout:
