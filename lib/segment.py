@@ -1,7 +1,7 @@
 import struct
 
 # Import constants
-from constant import ACK_FLAG, SYN_FLAG, FIN_FLAG
+from .constant import ACK_FLAG, SYN_FLAG, FIN_FLAG
 
 # Import CRC16
 from crc16 import CRC16

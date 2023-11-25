@@ -1,10 +1,10 @@
 import socket
 from typing import Tuple
-from segment import Segment
-from constant import DEFAULT_BROADCAST_PORT, DEFAULT_IP, DEFAULT_PORT, SEGMENT_SIZE, TIMEOUT
+from .segment import Segment
+from .constant import DEFAULT_BROADCAST_PORT, DEFAULT_IP, DEFAULT_PORT, SEGMENT_SIZE, TIMEOUT
 
 class Connection:
-    def __init__(self, ip : str = DEFAULT_IP, broadcast_port: int = DEFAULT_BROADCAST_PORT, port: int = DEFAULT_PORT, is_server: bool = False):
+    def __init__(self, ip : str = DEFAULT_IP, broadcast_port : int = DEFAULT_BROADCAST_PORT, port : int = DEFAULT_PORT, is_server : bool = False):
         # Init UDP socket
         if is_server:
             self.ip = ip
