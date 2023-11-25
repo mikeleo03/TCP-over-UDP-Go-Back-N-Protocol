@@ -1,5 +1,6 @@
 import os
-
+import logging
+import colorlog
 from math import ceil
 from socket import timeout
 from typing import List, Tuple
@@ -13,24 +14,54 @@ class Server:
     def __init__(self):
         # Init server
         args = Parser(is_server=True)
-        broadcast_port, pathfile_input = args.get_value()
-        self.broadcast_port: str = broadcast_port
-        self.pathfile: str = pathfile_input
-        self.connection = Connection(broadcast_port=broadcast_port, is_server=True)
+        server_arguments = args.get_value()
+        self.broadcast_port : int = server_arguments["broadcast_port"]
+        self.pathfile : str = server_arguments["pathfile_input"]
+        self.connection = Connection(broadcast_port=self.broadcast_port, is_server=True)
+        
         self.file = self.open_file()
         self.filesize = self.get_filesize()
         self.segment = Segment()
         self.client_list: List[Tuple[int, int]] = []
         self.filename = self.get_filename()
         self.breakdown_file()
-        print(f"[!] Source file | {self.filename} | {self.filesize} bytes")
-        
+
+        # Logger
+        self.logger = self.setup_logger()
+
+        self.logger.debug(f"[!] Source file | {self.filename} | {self.filesize} bytes")
+
+    def setup_logger(self):
+        # Set up logging configuration
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+
+        # Create console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        # Create formatter
+        formatter = colorlog.ColoredFormatter("%(asctime)s - %(log_color)s%(message)s", 
+                                              log_colors={'DEBUG': 'white',
+                                                          'INFO': 'green',
+                                                          'WARNING': 'yellow',
+                                                          'ERROR': 'red',
+                                                          'CRITICAL': 'bold_red',
+                                              })
+
+        # Add formatter to ch
+        ch.setFormatter(formatter)
+
+        # Add ch to logger
+        logger.addHandler(ch)
+        return logger
+    
     def open_file(self):
         try:
             file = open(f"{self.pathfile}", "rb")
             return file
         except FileNotFoundError:
-            print(f"[!] {self.pathfile} doesn't exists. Exiting...")
+            self.logger.error(f"[!] {self.pathfile} doesn't exists. Exiting...")
             exit(1)
             
     def get_filesize(self):
@@ -38,7 +69,7 @@ class Server:
             filesize = os.path.getsize(self.pathfile)
             return filesize
         except FileNotFoundError:
-            print(f"[!] {self.pathfile} doesn't exists. Exiting...")
+            self.logger.error(f"[!] {self.pathfile} doesn't exists. Exiting...")
             exit(1)
             
     def get_filename(self):
@@ -57,8 +88,8 @@ class Server:
             data_to_set = self.get_filechunk(i)
             segment.set_payload(data_to_set)
             header = segment.get_header()
-            header["seq_num"] = i + 3
-            header["ack_num"] = 3
+            header["seq_num"] = i + 2
+            header["ack_num"] = 2
             segment.set_header(header)
             self.list_segment.append(segment)
             
@@ -68,14 +99,14 @@ class Server:
         return self.file.read(PAYLOAD_SIZE)
     
     def listen_for_clients(self):
-        print("[!] Listening to broadcast address for clients.")
+        self.logger.debug("[!] Listening to broadcast address for clients.")
         while True:
             try:
                 client = self.connection.listen_single_segment(TIMEOUT_LISTEN)
                 client_address = client[1]
                 ip, port = client_address
                 self.client_list.append(client_address)
-                print(f"[!] Received request from {ip}:{port}")
+                self.logger.debug(f"[!] Received request from {ip}:{port}")
                 choice = input("[?] Listen more (y/n) ").lower()
                 while not self.choice_valid(choice):
                     print("[!] Please input correct input")
@@ -87,7 +118,10 @@ class Server:
                     print("")
                     break
             except timeout:
-                print("[!] Timeout Error for listening client. exiting")
+                if (len(self.client_list) == 0):
+                    self.logger.error("[!] Timeout error for listening client. Exiting")
+                else:
+                    self.logger.warning("[!] Timeout error for listening client")
                 break
             
     def choice_valid(self, choice: str):
@@ -99,13 +133,14 @@ class Server:
             return False
         
     def start_file_transfer(self):
+        self.logger.debug("[!] Commencing file transfer...")
         for client in self.client_list:
             self.three_way_handshake(client)
             self.file_transfer(client)
 
     def three_way_handshake(self, client_address: Tuple[str, int]) -> bool:
         # Three Way Handshake Protocol, for server-side to establishing connection with client
-        print(f"[!] [Client {client_address[0]}:{client_address[1]}] Initiating three way handshake")
+        self.logger.debug(f"[!] [Client {client_address[0]}:{client_address[1]}] Initiating three way handshake")
 
         # Set SYN flag to start establishing connection
         self.segment.set_flag(["SYN"])
@@ -117,10 +152,9 @@ class Server:
                 segment_header = self.segment.get_header()
                 segment_header["ack_num"] = 0
                 segment_header["seq_num"] = 0
-                self.segment.set_header(segment_header)
 
                 # Show status
-                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending SYN")
+                self.logger.debug(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending SYN")
 
                 # Send segment to client
                 self.connection.send_data(self.segment.get_bytes(), client_address)
@@ -130,7 +164,7 @@ class Server:
                     data, client_address = self.connection.listen_single_segment()
                     self.segment.set_from_bytes(data)
                 except timeout:
-                    print(f"[!] [Client {client_address[0]}:{client_address[1]}] SYN-ACK response timeout. Resending SYN")
+                    self.logger.error(f"[!] [Client {client_address[0]}:{client_address[1]}] SYN-ACK response timeout. Resending SYN")
             # If segment flag is SYN-ACK flag, then send ACK to client
             elif self.segment.get_flag() == SYN_ACK_FLAG:
                 # Set segment ACK flag
@@ -143,17 +177,17 @@ class Server:
                 self.segment.set_header(segment_header)
                 
                 # Show status
-                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Receive SYN-ACK")
-                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending ACK")
+                self.logger.debug(f"[!] [Client {client_address[0]}:{client_address[1]}] Receive SYN-ACK")
+                self.logger.debug(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending ACK")
 
                 # Send segment to client
                 self.connection.send_data(self.segment.get_bytes(), client_address)
                 break
             # Other than that, stop three way handshake
             else:
-                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Client already waiting for file. Ending three way handshake")
+                self.logger.debug(f"[!] [Client {client_address[0]}:{client_address[1]}] Client already waiting for file. Ending three way handshake")
         
-        print(f"[!] [Client {client_address[0]}:{client_address[1]}] Handshake established")
+        self.logger.info(f"[!] [Client {client_address[0]}:{client_address[1]}] Handshake established")
     
     def file_transfer(self, client_addr: Tuple[str, int]):
         # File transfer, server-side
@@ -168,7 +202,7 @@ class Server:
             
             for i in range(sequence_max):
                 # Start sending segment x
-                print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending Segment {sequence_base + i}")
+                self.logger.debug(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending Segment {sequence_base + i}")
                 if i + sequence_base < num_of_segment:
                     self.connection.send_data(self.list_segment[i + sequence_base - 2].get_bytes(), client_addr)
                     
@@ -177,34 +211,35 @@ class Server:
                     data, response_addr = self.connection.listen_single_segment()
                     segment = Segment()
                     segment.set_from_bytes(data)
-                    
+
                     # Various segment conditions
-                    if (client_addr[1] == response_addr[1] and segment.get_flag() == ACK_FLAG and segment.get_header()["ack"] == sequence_base + 1):
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received ACK {sequence_base + 1}")
+                    if (client_addr[1] == response_addr[1] and segment.get_flag() == ACK_FLAG and segment.get_header()["ack_num"] == sequence_base + 1):
+                        self.logger.debug(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received ACK {sequence_base + 1}")
                         sequence_base += 1
                         window_size = min(num_of_segment - sequence_base, WINDOW_SIZE)
                     elif client_addr[1] != response_addr[1]:
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received ACK from wrong client")
+                        self.logger.warning(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received ACK from wrong client")
                     elif segment.get_flag() == SYN_ACK_FLAG:
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Recieved SYN ACK Flag, client ask to reset connection")
+                        self.logger.debug(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received SYN ACK Flag, client ask to reset connection")
                         reset_conn = True
                         break
                     elif segment.get_flag() != ACK_FLAG:
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Recieved Wrong Flag")
+                        self.logger.warning(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received Wrong Flag")
                     else:
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received Wrong ACK")
-                        request_number = segment.get_header()["ack"]
+                        self.logger.warning(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received Wrong ACK")
+                        request_number = segment.get_header()["ack_num"]
                         if (request_number > sequence_base):
-                          sequence_max = (sequence_max - sequence_base) + request_number
-                          sequence_base = request_number
-                except:
-                    print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] [Timeout] ACK response timeout, resending prev seq num")
+                            sequence_max = (sequence_max - sequence_base) + request_number
+                            sequence_base = request_number
+
+                except timeout:
+                    self.logger.error(f"[!] [Client {client_addr[0]}:{client_addr[1]}] ACK response timeout. Resending previous sequence number")
         
         if reset_conn:
             self.three_way_handshake(client_addr)
             self.file_transfer(client_addr)
         else:
-            print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] File transfer complete, sending FIN...")
+            self.logger.info(f"[!] [Client {client_addr[0]}:{client_addr[1]}] File transfer complete. Sending FIN")
             sendFIN = Segment()
             sendFIN.set_flag(["FIN"])
             self.connection.send_data(sendFIN.get_bytes(), client_addr)
@@ -217,20 +252,19 @@ class Server:
                     segment = Segment()
                     segment.set_from_bytes(data)
                     if (client_addr[1] == response_addr[1] and segment.get_flag() == FIN_ACK_FLAG):
-                        print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Recieved FIN-ACK")
+                        self.logger.debug(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Received FIN-ACK")
                         sequence_base += 1
                         is_ack = True
                         
                 except timeout:
-                    print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] [Timeout] ACK response timeout, resending FIN")
+                    self.logger.error(f"[!] [Client {client_addr[0]}:{client_addr[1]}] ACK response timeout. Resending FIN")
                     self.connection.send_data(sendFIN.get_bytes(), client_addr)
 
             # send ACK and tear down connection
-            print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending ACK Tearing down connection.")
+            self.logger.info(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending ACK. Tearing down connection.")
             segmentACK = Segment()
             segmentACK.set_flag(["ACK"])
             self.connection.send_data(segmentACK.get_bytes(), client_addr)
-
 
 if __name__ == '__main__':
     main = Server()
