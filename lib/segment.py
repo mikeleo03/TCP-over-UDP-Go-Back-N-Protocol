@@ -3,6 +3,9 @@ import struct
 # Import constants
 from constant import ACK_FLAG, SYN_FLAG, FIN_FLAG
 
+# Import CRC16
+from crc16 import CRC16
+
 class SegmentFlag:
     def __init__(self, flag : bytes):
         # Init flag variable from flag byte
@@ -41,9 +44,9 @@ class Segment:
         return output
 
     def __calculate_checksum(self) -> int:
-        # Calculate checksum here, return checksum result
-        # TODO : implement checksum
-        return 10
+        # Calculate checksum with CRC16 class, return checksum
+        crc16 = CRC16(self.payload)
+        return crc16.calculate()
 
 
     # -- Setter --
