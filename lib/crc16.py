@@ -1,4 +1,4 @@
-from constant import CRC_POLYNOM, CRC_START
+from .constant import CRC_POLYNOM, CRC_START
 
 class CRC16:
     def __init__(self, data : bytes):
