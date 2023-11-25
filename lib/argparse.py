@@ -5,16 +5,22 @@ class FileTransferArgumentParser:
         self.is_server = is_server
 
         # Dictionary to store server-specific arguments
-        self.server_arguments = {"broadcast_port": "", "pathfile_input": ""}
+        self.server_arguments = {"broadcast_port": "", 
+                                 "pathfile_input": ""}
 
         # Dictionary to store client-specific arguments
-        self.client_arguments = {
-            "client_port": "",
-            "broadcast_port": "",
-            "pathfile_output": "",
-        }
+        self.client_arguments = {"client_port": "",
+                                 "broadcast_port": "",
+                                 "pathfile_output": ""}
 
         self._parse_arguments()
+
+    def _parse_arguments(self):
+        # If the process is server, parse according to server needed arguments. Otherwise, parse according to client needed arguments.
+        if self.is_server:
+            self._parse_server_arguments()
+        else:
+            self._parse_client_arguments()
 
     def _parse_server_arguments(self):
         # Argument parser for server application
@@ -33,7 +39,7 @@ class FileTransferArgumentParser:
             "pathfile_input",
             metavar="[pathfile input]",
             type=str,
-            help="Path to the file you want to send",
+            help="Path to the file to send",
         )
 
         # Parse server arguments
@@ -54,7 +60,7 @@ class FileTransferArgumentParser:
             "client_port",
             metavar="[client port]",
             type=int,
-            help="Client port to start the service",
+            help="Port where client service is located",
         )
         parser.add_argument(
             "broadcast_port",
@@ -66,7 +72,7 @@ class FileTransferArgumentParser:
             "pathfile_output",
             metavar="[pathfile output]",
             type=str,
-            help="Output path location",
+            help="Output file path",
         )
 
         # Parse client arguments
@@ -77,17 +83,11 @@ class FileTransferArgumentParser:
             "pathfile output": args.pathfile_output,
         }
 
-    def _parse_arguments(self):
-        if self.is_server:
-            self._parse_server_arguments()
-        else:
-            self._parse_client_arguments()
-
     def get_value(self):
         if self.is_server:
-            self.server_arguments
+            return self.server_arguments
         else:
-            self.client_arguments
+            return self.client_arguments
 
     def __str__(self):
         result = ""
