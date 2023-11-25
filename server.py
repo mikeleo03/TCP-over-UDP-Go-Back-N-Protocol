@@ -1,13 +1,13 @@
 import os
 
 from math import ceil
-from socket import timeout as socket_timeout
+from socket import timeout
 from typing import List, Tuple
 
 from lib.connection import Connection
 from lib.segment import Segment
 from lib.argparse import FileTransferArgumentParser as Parser
-from lib.constant import ACK_FLAG, FIN_ACK_FLAG, PAYLOAD_SIZE, SYN_ACK_FLAG, TIMEOUT_LISTEN, WINDOW_SIZE
+from lib.constant import SYN_FLAG, ACK_FLAG, FIN_ACK_FLAG, PAYLOAD_SIZE, SYN_ACK_FLAG, TIMEOUT_LISTEN, WINDOW_SIZE
 
 class Server:
     def __init__(self):
@@ -16,7 +16,7 @@ class Server:
         broadcast_port, pathfile_input = args.get_value()
         self.broadcast_port: str = broadcast_port
         self.pathfile: str = pathfile_input
-        self.conn = Connection(broadcast_port=broadcast_port, is_server=True)
+        self.connection = Connection(broadcast_port=broadcast_port, is_server=True)
         self.file = self.open_file()
         self.filesize = self.get_filesize()
         self.segment = Segment()
@@ -71,7 +71,7 @@ class Server:
         print("[!] Listening to broadcast address for clients.")
         while True:
             try:
-                client = self.conn.listen_single_segment(TIMEOUT_LISTEN)
+                client = self.connection.listen_single_segment(TIMEOUT_LISTEN)
                 client_address = client[1]
                 ip, port = client_address
                 self.client_list.append(client_address)
@@ -86,7 +86,7 @@ class Server:
                         print(f"{index+1} {ip}:{port}")
                     print("")
                     break
-            except socket_timeout:
+            except timeout:
                 print("[!] Timeout Error for listening client. exiting")
                 break
             
@@ -103,10 +103,58 @@ class Server:
             self.three_way_handshake(client)
             self.file_transfer(client)
 
-    def three_way_handshake(self):
-        # Three Way Handshake, client-side
-        pass
+    def three_way_handshake(self, client_address: Tuple[str, int]) -> bool:
+        # Three Way Handshake Protocol, for server-side to establishing connection with client
+        print(f"[!] [Client {client_address[0]}:{client_address[1]}] Initiating three way handshake")
 
+        # Set SYN flag to start establishing connection
+        self.segment.set_flag(["SYN"])
+
+        while True:
+            # If segment flag is SYN flag, then send segment to client
+            if self.segment.get_flag() == SYN_FLAG:
+                # Initialize segment sequence and ACK number
+                segment_header = self.segment.get_header()
+                segment_header["ack_num"] = 0
+                segment_header["seq_num"] = 0
+                self.segment.set_header(segment_header)
+
+                # Show status
+                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending SYN")
+
+                # Send segment to client
+                self.connection.send_data(self.segment.get_bytes(), client_address)
+                
+                # Wait for SYN-ACK from client
+                try:
+                    data, client_address = self.connection.listen_single_segment()
+                    self.segment.set_from_bytes(data)
+                except timeout:
+                    print(f"[!] [Client {client_address[0]}:{client_address[1]}] SYN-ACK response timeout. Resending SYN")
+            # If segment flag is SYN-ACK flag, then send ACK to client
+            elif self.segment.get_flag() == SYN_ACK_FLAG:
+                # Set segment ACK flag
+                self.segment.set_flag(["ACK"])
+
+                # Initialize segment sequence and ACK number
+                segment_header = self.segment.get_header()
+                segment_header["ack_num"] = 1
+                segment_header["seq_num"] = 1
+                self.segment.set_header(segment_header)
+                
+                # Show status
+                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Receive SYN-ACK")
+                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Sending ACK")
+
+                # Send segment to client
+                self.connection.send_data(self.segment.get_bytes(), client_address)
+                break
+            # Other than that, stop three way handshake
+            else:
+                print(f"[!] [Client {client_address[0]}:{client_address[1]}] Client already waiting for file. Ending three way handshake")
+        
+        print(f"[!] [Client {client_address[0]}:{client_address[1]}] Handshake established")
+    
     def file_transfer(self, client_addr: Tuple[str, int]):
         # File transfer, server-side
         # seq_num 0 for SYN
@@ -122,11 +170,11 @@ class Server:
                 # Start sending segment x
                 print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending Segment {sequence_base + i}")
                 if i + sequence_base < num_of_segment:
-                    self.conn.send_data(self.list_segment[i + sequence_base - 2].get_bytes(), client_addr)
+                    self.connection.send_data(self.list_segment[i + sequence_base - 2].get_bytes(), client_addr)
                     
             for i in range(sequence_max):
                 try:
-                    data, response_addr = self.conn.listen_single_segment()
+                    data, response_addr = self.connection.listen_single_segment()
                     segment = Segment()
                     segment.set_from_bytes(data)
                     
@@ -159,13 +207,13 @@ class Server:
             print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] File transfer complete, sending FIN...")
             sendFIN = Segment()
             sendFIN.set_flag(["FIN"])
-            self.conn.send_data(sendFIN.get_bytes(), client_addr)
+            self.connection.send_data(sendFIN.get_bytes(), client_addr)
             is_ack = False
 
             # Wait for ack
             while not is_ack:
                 try:
-                    data, response_addr = self.conn.listen_single_segment()
+                    data, response_addr = self.connection.listen_single_segment()
                     segment = Segment()
                     segment.set_from_bytes(data)
                     if (client_addr[1] == response_addr[1] and segment.get_flag() == FIN_ACK_FLAG):
@@ -173,15 +221,15 @@ class Server:
                         sequence_base += 1
                         is_ack = True
                         
-                except socket_timeout:
+                except timeout:
                     print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] [Timeout] ACK response timeout, resending FIN")
-                    self.conn.send_data(sendFIN.get_bytes(), client_addr)
+                    self.connection.send_data(sendFIN.get_bytes(), client_addr)
 
             # send ACK and tear down connection
             print(f"[!] [Client {client_addr[0]}:{client_addr[1]}] Sending ACK Tearing down connection.")
             segmentACK = Segment()
             segmentACK.set_flag(["ACK"])
-            self.conn.send_data(segmentACK.get_bytes(), client_addr)
+            self.connection.send_data(segmentACK.get_bytes(), client_addr)
 
 
 if __name__ == '__main__':
