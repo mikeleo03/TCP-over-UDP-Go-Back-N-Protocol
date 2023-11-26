@@ -121,7 +121,9 @@ class Client:
 
     def listen_file_transfer(self):
         # File transfer, client-side
-        request_number = 2
+        metadata_number = 2
+        metadata_received = False
+        request_number = 3
         data, server_address = None, None
 
         while True:
@@ -129,7 +131,14 @@ class Client:
                 data, server_address = self.connection.listen_single_segment(3)
                 if server_address[1] == self.broadcast_port:
                     self.segment.set_from_bytes(data)
-                    if self.segment.valid_checksum() and self.segment.get_header()["seq_num"] == request_number:
+                    if (self.segment.valid_checksum() and self.segment.get_header()["seq_num"] == metadata_number and metadata_received == False):
+                        payload = self.segment.get_payload()
+                        metadata = payload.decode().split(",")
+                        self.logger.info(f"[!] [Server {server_address[0]}:{server_address[1]}] Received Filename: {metadata[0]}, File Extension: {metadata[1]}, File Size: {metadata[2]}")
+                        metadata_received = True
+                        self.send_ack(server_address, metadata_number)
+                        continue
+                    elif self.segment.valid_checksum() and self.segment.get_header()["seq_num"] == request_number:
                         payload = self.segment.get_payload()
                         self.file.write(payload)
                         self.logger.debug(f"[!] [Server {server_address[0]}:{server_address[1]}] Received Segment {request_number}")

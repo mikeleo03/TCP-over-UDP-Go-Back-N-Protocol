@@ -80,6 +80,20 @@ class Server:
     
     def breakdown_file(self):
         self.list_segment: List[Segment] = []
+        
+        # Metadata support 
+        metadata_segment = Segment()
+        filename = self.filename.split(".")[0]
+        extension = self.filename.split(".")[-1]
+        filesize = self.filesize
+        metadata = filename.encode() + ",".encode() + extension.encode() + ",".encode() + str(filesize).encode()
+        metadata_segment.set_payload(metadata)
+        header = metadata_segment.get_header()
+        header["seq_num"] = 2
+        header["ack_num"] = 0
+        metadata_segment.set_header(header)
+        self.list_segment.append(metadata_segment)
+        
         num_of_segment = ceil(self.filesize / PAYLOAD_SIZE)
         
         # Sending data
@@ -88,8 +102,8 @@ class Server:
             data_to_set = self.get_filechunk(i)
             segment.set_payload(data_to_set)
             header = segment.get_header()
-            header["seq_num"] = i + 2
-            header["ack_num"] = 2
+            header["seq_num"] = i + 3
+            header["ack_num"] = 3
             segment.set_header(header)
             self.list_segment.append(segment)
             
@@ -193,6 +207,7 @@ class Server:
         # File transfer, server-side
         # seq_num 0 for SYN
         # seq_num 1 for ACK
+        # seq_num 2 for Metadata
         num_of_segment = len(self.list_segment) + 2
         window_size = min(num_of_segment - 2, WINDOW_SIZE)
         sequence_base = 2

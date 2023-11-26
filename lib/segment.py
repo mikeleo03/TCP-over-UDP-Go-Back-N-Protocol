@@ -67,6 +67,9 @@ class Segment:
             elif flag == "FIN":
                 new_flag = new_flag | FIN_FLAG
         self.flag = SegmentFlag(new_flag)
+        
+    def set_checksum(self, checksum: int):
+        self.checksum = checksum
 
 
     # -- Getter --
