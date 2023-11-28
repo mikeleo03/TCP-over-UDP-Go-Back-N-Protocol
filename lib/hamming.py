@@ -117,21 +117,29 @@ def decode_hamming(encoded_data):
 
 # Utils
 # Convert bytes to binary string
-def bytes_to_binary(input_bytes):
-    binary_representation = ''.join(format(byte, '08b') for byte in input_bytes)
-    return binary_representation
+def binary_to_bytes(binary_str):
+    # Ensure the binary string length is a multiple of 8 by adding padding
+    padding = (8 - len(binary_str) % 8) % 8
+    binary_str = '0' * padding + binary_str
 
-# Convert binary string to bytes
-def binary_to_bytes(binary_string):
-    byte_list = [int(binary_string[i:i+8], 2) for i in range(0, len(binary_string), 8)]
-    bytes_result = bytes(byte_list)
-    return bytes_result
+    # Convert binary string to bytes
+    byte_array = bytearray()
+    for i in range(0, len(binary_str), 8):
+        byte = int(binary_str[i:i+8], 2)
+        byte_array.append(byte)
 
+    return bytes(byte_array)
+
+
+def bytes_to_binary(byte_data):
+    # Converts bytes to a binary string.
+    binary_str = ''.join(format(byte, '08b') for byte in byte_data)
+    return binary_str
 
 
 # Test
 # 1. Initial
-message = b"hello world"
+message = b"\x03\x00\x00\x00\x03\x00\x00\x00\x00\x00\x105Warna cerah yang terlihat\r\nDiriku mahir sembunyi rasa\r\nSebenarnya hitam pekat\r\nKututup rapat, jadi rahasia\r\nSatu dua kali, 'ku tak apa-apa\r\nKamu pikir hidupku baik-baik saja?\r\nSiapa yang peduli kupunya air mata?\r\nKamu hanya pinta diri berikan tawa\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nWajah riangku perisai jitu\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nTapi sampai kapan kubegitu?\r\nMalam hari berwahana\r\nPikiran liarku juaranya\r\nBukan 'ku tak berusaha\r\nIngin kulepas sekuat tenaga\r\nSatu dua kali, 'ku tak apa-apa\r\nKamu pikir hidupku baik-baik saja?\r\nSiapa yang peduli kupunya air mata?\r\nKamu hanya pinta diri berikan tawa, ho-oh\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nWajah riangku perisai jitu\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nTapi sampai kapan kubegitu?\r\nAku bulan yang terangi\r\nMalam-malammu yang sepi\r\nLalu siapa yang temani\r\nRasa gelisah kupikul sendiri\r\nHa-ho\r\n(Ha-ha, ha-ha)\r\nHa-hm, yeah\r\n(Ha-ha, ha-ha)\r\nHa-oh\r\n(Ha-ha, ha-ha)\r\nHu-hu-hu\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nWajah riangku perisai jitu\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nTapi sampai kapan kubegitu?\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha\r\nWajah riangku perisai jitu (wajah riangku)\r\nHa-ha, ha-ha\r\nHa-ha, ha-ha, ha-ha (hu-uu)\r\nTapi sampai kapan kubegitu?"
 print("Initial message:", message)
 
 # 2. Convert into binary
@@ -142,33 +150,13 @@ print("Binary message:", binary_msg)
 encoded = encode_hamming(binary_msg)
 print("Hamming encoded:", encoded)
 
-# 4. Simulating error during message sending
-encoded = list(encoded)
-encoded[6] = '1'
-encoded = ''.join(encoded)
-print("Error result:", encoded)
-
-# 5. Detecting error and recovery mechanism
-error, copies = detect_error(encoded)
-if (error == 0):
-    print('There is no error in the hamming code received')
-elif (error >= len(copies) or error < 0):
-    print('Error cannot be detected')
-else:
-    print('Error is in bit', error)
-    print("Error copies:", copies)
-
-    fixed = fix_error(error, copies)
-    print("Fixed hamming:", fixed)
-    encoded = fixed
-
-# 6. Decoding hamming encoded
+# 4. Decoding hamming encoded
 decoded = decode_hamming(encoded)
 print("Decoded message:", decoded)
 
-# 7. Convert back to original message
+# 5. Convert back to original message
 original_msg = binary_to_bytes(decoded)
 print("Original message:", original_msg)
 
-# 8. Final check, is the result original?
+# 6. Final check, is the result original?
 print("Result:", original_msg == message)
