@@ -1,4 +1,4 @@
-# Functions to do hamming encoding
+# Functions to do hamming ecc
 # Implemented using most popular, 7-bit hamming encoding
 def encode_hamming(plain_data):
     # Initial processing the plain data
@@ -117,16 +117,24 @@ def decode_hamming(encoded_data):
 
 # Utils
 # Convert bytes to binary string
-def bytes_to_binary(input_bytes):
-    binary_representation = ''.join(format(byte, '08b') for byte in input_bytes)
-    return binary_representation
+def binary_to_bytes(binary_str):
+    # Ensure the binary string length is a multiple of 8 by adding padding
+    padding = (8 - len(binary_str) % 8) % 8
+    binary_str = '0' * padding + binary_str
 
-# Convert binary string to bytes
-def binary_to_bytes(binary_string):
-    byte_list = [int(binary_string[i:i+8], 2) for i in range(0, len(binary_string), 8)]
-    bytes_result = bytes(byte_list)
-    return bytes_result
+    # Convert binary string to bytes
+    byte_array = bytearray()
+    for i in range(0, len(binary_str), 8):
+        byte = int(binary_str[i:i+8], 2)
+        byte_array.append(byte)
 
+    return bytes(byte_array)
+
+
+def bytes_to_binary(byte_data):
+    # Converts bytes to a binary string.
+    binary_str = ''.join(format(byte, '08b') for byte in byte_data)
+    return binary_str
 
 
 # Test
