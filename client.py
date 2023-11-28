@@ -1,7 +1,7 @@
 import time
 import logging
 import colorlog
-from socket import timeout 
+import socket
 
 from lib.segment import Segment
 from lib.argparse import FileTransferArgumentParser
@@ -111,7 +111,7 @@ class Client:
 
                     # Send segment to server
                     self.connection.send_data(self.segment.get_bytes(), server_address)
-            except timeout:
+            except socket.timeout:
                 # If timeout happened when waiting for server ACK flag (third phase of handshake)
                 if self.segment.get_flag() == SYN_ACK_FLAG:
                     self.logger.error(f"[!] [Server {server_address[0]}:{server_address[1]}] ACK response timeout")
@@ -165,7 +165,7 @@ class Client:
                 
                 self.send_ack(server_address, request_number)
             
-            except timeout:
+            except socket.timeout:
                 self.logger.error(f"[!] [Server {server_address[0]}:{server_address[1]}] Timeout error. Resending previous sequence number")
                 self.send_ack(server_address, request_number)
 
@@ -188,8 +188,8 @@ class Client:
                     self.logger.debug(f"[!] [Server {server_address[0]}:{server_address[1]}] Received ACK. Tearing down connection.")
                     ack = True
                     
-            except timeout:
-                if time.time() > TIMEOUT:
+            except socket.timeout:
+                if time.time() > timeout:
                     self.logger.warning(f"[!] [Server {server_address[0]}:{server_address[1]}] Waiting for too long. Connection closed")
                     break
                 self.logger.warning(f"[!] [Server {server_address[0]}:{server_address[1]}] Timeout error. Resending FIN-ACK")

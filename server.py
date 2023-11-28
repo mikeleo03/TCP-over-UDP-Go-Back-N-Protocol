@@ -5,7 +5,7 @@ import threading
 import time
 
 from math import ceil
-from socket import timeout
+import socket
 from typing import List, Tuple, Dict
 
 from lib.connection import Connection
@@ -153,7 +153,7 @@ class Server:
                             print(f"{index+1}. {ip}:{port}")
                         print("")
                         break
-                except timeout:
+                except socket.timeout:
                     if (len(self.client_list) == 0):
                         self.logger.error("[!] Timeout error for listening client. Exiting")
                     else:
@@ -175,7 +175,7 @@ class Server:
                     new_thread.start()
                 else:
                     self.parallel_client_list[client_address].append(client[0])
-            except timeout:
+            except socket.timeout:
                 self.logger.error("[!] Timeout error for listening client. Exiting")
                 exit(0)
 
@@ -206,7 +206,7 @@ class Server:
             while (time.time() < just_now):
                 if len(self.parallel_client_list[client_address]) > 0:
                     return self.parallel_client_list[client_address].pop(0), client_address
-            raise timeout
+            raise socket.timeout
         else:
             return self.connection.listen_single_segment()
         
@@ -235,7 +235,7 @@ class Server:
                 try:
                     data, client_address = self.get_segment(client_address)
                     self.segment.set_from_bytes(data)
-                except timeout:
+                except socket.timeout:
                     self.logger.error(f"[!] [Client {client_address[0]}:{client_address[1]}] SYN-ACK response timeout. Resending SYN")
             # If segment flag is SYN-ACK flag, then send ACK to client
             elif self.segment.get_flag() == SYN_ACK_FLAG:
@@ -305,7 +305,7 @@ class Server:
                             sequence_max = (sequence_max - sequence_base) + request_number
                             sequence_base = request_number
 
-                except timeout:
+                except socket.timeout:
                     self.logger.error(f"[!] [Client {client_address[0]}:{client_address[1]}] ACK response timeout. Resending previous sequence number")
         
         if reset_conn:
@@ -331,7 +331,7 @@ class Server:
                         if self.parallel:
                             self.parallel_client_list.pop(client_address)
                         
-                except timeout:
+                except socket.timeout:
                     self.logger.error(f"[!] [Client {client_address[0]}:{client_address[1]}] ACK response timeout. Resending FIN")
                     self.connection.send_data(sendFIN.get_bytes(), client_address)
 
