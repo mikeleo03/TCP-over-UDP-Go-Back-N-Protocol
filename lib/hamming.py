@@ -1,4 +1,4 @@
-# Functions to do hamming encoding
+# Functions to do hamming ecc
 # Implemented using most popular, 7-bit hamming encoding
 def encode_hamming(plain_data):
     # Initial processing the plain data
