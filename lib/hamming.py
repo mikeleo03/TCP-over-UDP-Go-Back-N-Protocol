@@ -131,44 +131,45 @@ def binary_to_bytes(binary_string):
 
 # Test
 # 1. Initial
-message = b"hello world"
-print("Initial message:", message)
+if __name__ == "__main__":
+    message = b"hello world"
+    print("Initial message:", message)
 
-# 2. Convert into binary
-binary_msg = bytes_to_binary(message)
-print("Binary message:", binary_msg)
+    # 2. Convert into binary
+    binary_msg = bytes_to_binary(message)
+    print("Binary message:", binary_msg)
 
-# 3. Applying 7-bit hamming encoding
-encoded = encode_hamming(binary_msg)
-print("Hamming encoded:", encoded)
+    # 3. Applying 7-bit hamming encoding
+    encoded = encode_hamming(binary_msg)
+    print("Hamming encoded:", encoded)
 
-# 4. Simulating error during message sending
-encoded = list(encoded)
-encoded[6] = '1'
-encoded = ''.join(encoded)
-print("Error result:", encoded)
+    # 4. Simulating error during message sending
+    encoded = list(encoded)
+    encoded[6] = '1'
+    encoded = ''.join(encoded)
+    print("Error result:", encoded)
 
-# 5. Detecting error and recovery mechanism
-error, copies = detect_error(encoded)
-if (error == 0):
-    print('There is no error in the hamming code received')
-elif (error >= len(copies) or error < 0):
-    print('Error cannot be detected')
-else:
-    print('Error is in bit', error)
-    print("Error copies:", copies)
+    # 5. Detecting error and recovery mechanism
+    error, copies = detect_error(encoded)
+    if (error == 0):
+        print('There is no error in the hamming code received')
+    elif (error >= len(copies) or error < 0):
+        print('Error cannot be detected')
+    else:
+        print('Error is in bit', error)
+        print("Error copies:", copies)
 
-    fixed = fix_error(error, copies)
-    print("Fixed hamming:", fixed)
-    encoded = fixed
+        fixed = fix_error(error, copies)
+        print("Fixed hamming:", fixed)
+        encoded = fixed
 
-# 6. Decoding hamming encoded
-decoded = decode_hamming(encoded)
-print("Decoded message:", decoded)
+    # 6. Decoding hamming encoded
+    decoded = decode_hamming(encoded)
+    print("Decoded message:", decoded)
 
-# 7. Convert back to original message
-original_msg = binary_to_bytes(decoded)
-print("Original message:", original_msg)
+    # 7. Convert back to original message
+    original_msg = binary_to_bytes(decoded)
+    print("Original message:", original_msg)
 
-# 8. Final check, is the result original?
-print("Result:", original_msg == message)
+    # 8. Final check, is the result original?
+    print("Result:", original_msg == message)
